@@ -3,11 +3,10 @@ const tmi = require("tmi.js");
 const { Client } = require("pg");
 require("dotenv").config();
 
-
 let current = new Date();
 let lastmsg = new Date();
 
-const permNames = ["owner","mod","vip","subscriber","everyone"]
+const permNames = ["owner", "mod", "vip", "subscriber", "everyone"];
 
 const db = new Client({
   host: process.env.DB_HOST,
@@ -21,35 +20,37 @@ var count = 0;
 var snipes = 0;
 var listcount = 0;
 
+const RATE_COMMON = 0.38;
+const RATE_UNCOMMON = 0.38;
+const RATE_RARE = 0.32;
+const RATE_LEGENDARY = 0.28;
+const MIN_MYTHICAL = 30000;
+
 const addChannel = async (channel) => {
-  checkConnection().then(async () => {
-    try {
-      await db.query("INSERT INTO channels(channel) VALUES ($1) ON CONFLICT DO NOTHING", [channel.substring(1)]);
-    } catch (e) {
-      console.log(e.stack);
-    }
-  });
+  await checkConnection();
+  try {
+    await db.query("INSERT INTO channels(channel) VALUES ($1) ON CONFLICT DO NOTHING", [channel.substring(1)]);
+  } catch (e) {
+    console.log(e.stack);
+  }
 };
 
-
-const setLastMsg = async (channel,time) => {
-  checkConnection().then(async () => {
-    try {
-      await db.query("UPDATE channels SET last_msg = $2 WHERE channel = $1 ", [channel.substring(1),time]);
-    } catch (e) {
-      console.log(e.stack);
-    }
-  });
+const setLastMsg = async (channel, time) => {
+  await checkConnection();
+  try {
+    await db.query("UPDATE channels SET last_msg = $2 WHERE channel = $1 ", [channel.substring(1), time]);
+  } catch (e) {
+    console.log(e.stack);
+  }
 };
 
-const setCooldown = async (channel,cooldown) => {
-  checkConnection().then(async () => {
-    try {
-      await db.query("UPDATE channels SET cooldown = $2 WHERE channel = $1 ", [channel.substring(1),cooldown]);
-    } catch (e) {
-      console.log(e.stack);
-    }
-  });
+const setCooldown = async (channel, cooldown) => {
+  await checkConnection();
+  try {
+    await db.query("UPDATE channels SET cooldown = $2 WHERE channel = $1 ", [channel.substring(1), cooldown]);
+  } catch (e) {
+    console.log(e.stack);
+  }
 };
 
 const getCooldown = async (channel) => {
@@ -74,14 +75,34 @@ const getPerms = async (channel) => {
   }
 };
 
-const setPerms = async (channel,perms) => {
+const setPerms = async (channel, perms) => {
+  await checkConnection();
+  try {
+    await db.query("UPDATE channels SET perms = $2 WHERE channel = $1 ", [channel.substring(1), perms]);
+  } catch (e) {
+    console.log(e.stack);
+  }
+};
+
+const setSnipeListAmount = async (channel, length) => {
   checkConnection().then(async () => {
     try {
-      await db.query("UPDATE channels SET perms = $2 WHERE channel = $1 ", [channel.substring(1),perms]);
+      await db.query("UPDATE channels SET list_length = $2 WHERE channel = $1 ", [channel.substring(1), length]);
     } catch (e) {
       console.log(e.stack);
     }
   });
+};
+
+const getSnipeListAmount = async (channel) => {
+  await checkConnection();
+  try {
+    let res = await db.query("SELECT list_length FROM channels WHERE channel = $1;", [channel.substring(1)]);
+    if (res.rowCount == 0) return 0;
+    return res.rows[0].list_length;
+  } catch (e) {
+    console.log(e.stack);
+  }
 };
 
 const getCurrentTime = async () => {
@@ -113,8 +134,8 @@ async function checkConnection() {
       .catch((err) => console.error("Reconnection error", err.stack));
   }
 }
-//const channels = ["PoweredTV","KaytaAkaSaucy","Tomogunchi","Slim3cube"];
-const channels = ["PoweredTV"];
+const channels = ["PoweredTV","KaytaAkaSaucy","Tomogunchi","Slim3cube"];
+//const channels = ["poweredtvbot"];
 const opts = {
   options: {
     debug: false,
@@ -134,138 +155,167 @@ client.connect();
 client.on("connected", () => {
   console.log("connected");
   db.connect()
-  .then(() => {
-    console.log(`Connected to db as ${db.user}`)
-    channels.forEach(element => {
-      addChannel(element);
-    });
-    
-  })
-  .catch((err) => console.error("Connection error", err.stack));
+    .then(() => {
+      console.log(`Connected to db as ${db.user}`);
+      channels.forEach((element) => {
+        addChannel(element);
+      });
+    })
+    .catch((err) => console.error("Connection error", err.stack));
 });
 client.on("message", async (channel, userstate, message, self) => {
   if (self) return;
   if (message.toLowerCase().startsWith("!setperm")) {
-    if(userstate["badges-raw"]==null||!userstate["badges-raw"].includes("broadcaster/1")){
+    if (userstate["badges-raw"] == null || !userstate["badges-raw"].includes("broadcaster/1")) {
       client.say(channel, `Only channel owners can use this command.`);
       return;
     }
-    let perms = message.split(" ")[1]!=undefined?message.split(" ")[1]:null;
-    switch(perms.toLowerCase()){
+    let perms = message.split(" ")[1] != undefined ? message.split(" ")[1] : null;
+    switch (perms.toLowerCase()) {
       case "all":
-        setPerms(channel,4);
+        setPerms(channel, 4);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "everyone":
-        setPerms(channel,4);
+        setPerms(channel, 4);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "sub":
-        setPerms(channel,3);
+        setPerms(channel, 3);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "subscriber":
-        setPerms(channel,3);
+        setPerms(channel, 3);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "vip":
-        setPerms(channel,2);
+        setPerms(channel, 2);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "mod":
-        setPerms(channel,1);
+        setPerms(channel, 1);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "owner":
-        setPerms(channel,0);
+        setPerms(channel, 0);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       case "me":
-        setPerms(channel,0);
+        setPerms(channel, 0);
         client.say(channel, `!snipe permission set to ${perms.toLowerCase()}.`);
         break;
       default:
-        client.say(channel, `Please use the command as following: !setperm`);
+        client.say(channel, `Please use the command as following: !setperm {everyone|subscriber|vip|mod|owner}`);
         break;
     }
-  }
-  if(message.toLowerCase().startsWith("!bot")||message.toLowerCase().startsWith("!vengebot")){
+  } else if (message.toLowerCase().startsWith("!bot") || message.toLowerCase().startsWith("!vengebot")) {
     client.say(channel, `Support Discord - https://discord.gg/eNGMCPVtUU`);
-  }
-  if(message.toLowerCase().startsWith("!docs")||message.toLowerCase().startsWith("!documentation")||message.toLowerCase().startsWith("!command")){
+  } else if (message.toLowerCase().startsWith("!docs") || message.toLowerCase().startsWith("!documentation") || message.toLowerCase().startsWith("!command")) {
     client.say(channel, `Documentation - https://powered.gitbook.io/venge-market`);
-  }
-  if (message.toLowerCase().startsWith("!setcooldown")) {
-    if(userstate["badges-raw"]==null){
+  } else if (message.toLowerCase().startsWith("!setcooldown")) {
+    if (userstate["badges-raw"] == null) {
       client.say(channel, `Only channel owners can use this command.`);
       return;
     }
-    if(userstate["badges-raw"].includes("broadcaster/1")){
-      let time = message.split(" ")[1]!=undefined?message.split(" ")[1]:null;
-      if(time!=null){
+    if (userstate["badges-raw"].includes("broadcaster/1")) {
+      let time = message.split(" ")[1] != undefined ? message.split(" ")[1] : null;
+      if (time != null) {
         time = Math.floor(Number(time));
-        if(time !== Infinity && time >= 0){
-          if(time > 20){
+        if (time !== Infinity && time >= 0) {
+          if (time > 20) {
             client.say(channel, `Cooldown set to ${time} sec!`);
-            setCooldown(channel,time)
-          }else{
+            setCooldown(channel, time);
+          } else {
             client.say(channel, `Cooldown has to be higher then 20 sec!`);
           }
-        }else{
+        } else {
           client.say(channel, `Please use a number!`);
         }
-      }else{
+      } else {
         client.say(channel, `Please use the command like: !setcooldown 69`);
       }
-    }else{
+    } else {
       client.say(channel, `Only channel owners can use this command.`);
     }
-  }
-  if (message.toLowerCase().startsWith("!cooldown")) {
-    client.say(channel,`The cooldown is ${await getCooldown(channel)}. To change this say !setcooldown 'Cooldown'`)
-    await getCooldown()
-  }
-  if (message.toLowerCase().startsWith("!snipe")) {
+  } else if (message.toLowerCase().startsWith("!setmax")) {
+    if (userstate["badges-raw"] == null) {
+      client.say(channel, `Only channel owners can use this command.`);
+      return;
+    }
+    if (userstate["badges-raw"].includes("broadcaster/1")) {
+      let time = message.split(" ")[1] != undefined ? message.split(" ")[1].toLowerCase() : null;
+      if (time != null) {
+        if (time != "all") time = Math.floor(Number(time));
+        if ((time !== Infinity && time >= 0) || time == "all") {
+          if (time > 0 || time == "all") {
+            client.say(channel, `Maximum set to ${time == "all" ? "all" : time}!`);
+            setSnipeListAmount(channel, time == "all" ? 1069 : time);
+          } else {
+            client.say(channel, `Maximum has to be bigger then 0`);
+          }
+        } else {
+          client.say(channel, `Please use a number!`);
+        }
+      } else {
+        client.say(channel, `Please use the command like: !setmax 3`);
+      }
+    } else {
+      client.say(channel, `Only channel owners can use this command.`);
+    }
+  } else if (message.toLowerCase().startsWith("!max")) {
+    let isowner = false;
+    if(userstate["badges-raw"]==null)userstate["badges-raw"]="";
+    if(userstate["badges-raw"].includes("broadcaster/1")) isowner = true;
+    let amount = await getSnipeListAmount(channel);
+    client.say(channel, `The max amount of snipes shown ${amount==1||amount==1069?"is":"are"} ${amount==1069?"all":amount} snipes. ${isowner?"To change this say !setmax {amount|all}":""} `);
+    console.log(amount);
+  } else if (message.toLowerCase().startsWith("!cooldown")) {
+    let isowner = false;
+    if(userstate["badges-raw"]==null)userstate["badges-raw"]="";
+    if(userstate["badges-raw"].includes("broadcaster/1")) isowner = true;
+    client.say(channel, `The cooldown is ${await getCooldown(channel)}. ${isowner?"To change this say !setcooldown {amount}":""}`);
+  } else if (message.toLowerCase().startsWith("!snipe")) {
     count = 0;
     snipes = 0;
     const perm = await getPerms(channel);
     let allowed = true;
-    switch(perm){
+    switch (perm) {
       case 3:
-        if(userstate["badges-raw"]==null){
-          allowed=false;
+        if (userstate["badges-raw"] == null) {
+          allowed = false;
           break;
-        } 
-        if(!userstate["badges-raw"].includes("subscriber")&&!userstate["badges-raw"].includes("vip")&&!userstate.mod&&!userstate["badges-raw"].includes("broadcaster/1")) allowed=false;
+        }
+        if (!userstate["badges-raw"].includes("subscriber") && !userstate["badges-raw"].includes("vip") && !userstate.mod && !userstate["badges-raw"].includes("broadcaster/1"))
+          allowed = false;
         break;
       case 2:
-        if(userstate["badges-raw"]==null){
-          allowed=false;
+        if (userstate["badges-raw"] == null) {
+          allowed = false;
           break;
-        } 
-        if(!userstate["badges-raw"].includes("vip")&&!userstate.mod&&!userstate["badges-raw"].includes("broadcaster/1")) allowed=false;
+        }
+        if (!userstate["badges-raw"].includes("vip") && !userstate.mod && !userstate["badges-raw"].includes("broadcaster/1")) allowed = false;
         break;
       case 1:
-        if(userstate["badges-raw"]==null){
-          allowed=false;
+        if (userstate["badges-raw"] == null) {
+          allowed = false;
           break;
-        } 
-        if(!userstate.mod&&!userstate["badges-raw"].includes("broadcaster/1")) allowed=false;
+        }
+        if (!userstate.mod && !userstate["badges-raw"].includes("broadcaster/1")) allowed = false;
         break;
       case 0:
-        if(userstate["badges-raw"]==null){
-          allowed=false;
+        if (userstate["badges-raw"] == null) {
+          allowed = false;
           break;
-        } 
-        if(!userstate["badges-raw"].includes("broadcaster/1")) allowed=false;
+        }
+        if (!userstate["badges-raw"].includes("broadcaster/1")) allowed = false;
         break;
     }
 
-    if(!allowed){
-      client.say(channel,`Only ${permNames[perm]}s and higher roles are allowed to use this command.`);
+    if (!allowed) {
+      client.say(channel, `Only ${permNames[perm]}s and higher roles are allowed to use this command.`);
       return;
     }
-
+    client.say(channel,"Looking for snipes...");
     current = await getCurrentTime();
     lastmsg = await getLastMsg(channel);
     cooldown = await getCooldown(channel);
@@ -274,20 +324,14 @@ client.on("message", async (channel, userstate, message, self) => {
       client.say(channel, `You have to wait ${Math.round(cooldown - Difference_In_Time)} sec to do this again.`);
       return;
     }
-    setLastMsg(channel,current);
+    setLastMsg(channel, current);
     const sales = fetch("https://gateway.venge.io/?request=get_skins_list")
       .then((res) => res.json())
       .then(async (list) => {
-        let items = {
-          Common: [],
-          Uncommon: [],
-          Rare: [],
-          Legendary: [],
-          Mythical: [],
-        };
+        let items = [];
         listcount = list.result.length;
         await list.result.forEach(async (element) => {
-          await checkitem(element, items, list);
+          checkitem(element, items, list);
         });
       });
 
@@ -306,59 +350,107 @@ client.on("message", async (channel, userstate, message, self) => {
               switch (body.result[0].rarity) {
                 case "Common":
                   avg = (parseInt(body.result[1].price) + parseInt(body.result[2].price) + parseInt(body.result[3].price)) / 3;
-                  if (parseInt(body.result[0].price) <= avg - avg * 0.38) {
+                  if (parseInt(body.result[0].price) <= avg - avg * RATE_COMMON) {
                     snipes++;
-                    client.say(channel, `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`);
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: parseInt(body.result[0].price) * (avg - avg * RATE_COMMON),
+                      msg: `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`,
+                    });
                   }
                   break;
                 case "Uncommon":
                   avg = (parseInt(body.result[1].price) + parseInt(body.result[2].price) + parseInt(body.result[3].price)) / 3;
-                  if (parseInt(body.result[0].price) <= avg - avg * 0.38) {
+                  if (parseInt(body.result[0].price) <= avg - avg * RATE_UNCOMMON) {
                     snipes++;
-                    client.say(channel, `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`);
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: parseInt(body.result[0].price) * (avg - avg * RATE_UNCOMMON),
+                      msg: `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`,
+                    });
                   }
                   break;
                 case "Rare":
                   avg = (parseInt(body.result[1].price) + parseInt(body.result[2].price)) / 2;
-                  if (parseInt(body.result[0].price) <= avg - avg * 0.32) {
+                  if (parseInt(body.result[0].price) <= avg - avg * RATE_RARE) {
                     snipes++;
-                    client.say(channel, `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`);
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: parseInt(body.result[0].price) * (avg - avg * RATE_RARE),
+                      msg: `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`,
+                    });
                   }
                   break;
                 case "Legendary":
                   avg = (parseInt(body.result[1].price) + parseInt(body.result[2].price) + parseInt(body.result[3].price)) / 3;
-                  if (parseInt(body.result[0].price) <= avg - avg * 0.28) {
+                  if (parseInt(body.result[0].price) <= avg - avg * RATE_LEGENDARY) {
                     snipes++;
-                    client.say(channel, `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`);
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: parseInt(body.result[0].price) * (avg - avg * RATE_LEGENDARY),
+                      msg: `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`,
+                    });
                   }
                   break;
                 case "Mythical":
-                  if (body.result[0].price <= 30000) {
+                  if (body.result[0].price <= MIN_MYTHICAL) {
                     snipes++;
-                    client.say(channel, `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`);
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: 10000000 - body.result[0].price * 5,
+                      msg: `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`,
+                    });
                   }
                   break;
               }
             } else {
               if (body.result == 1 && body.result) {
                 if (body.result[0].rarity == "Mythical") {
-                  if (body.result[0].price <= 30000) {
-                    client.say(channel, `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price}`);
+                  if (body.result[0].price <= MIN_MYTHICAL) {
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: 10000000 - body.result[0].price * 5,
+                      msg: `${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price} [${body.result[0].rarity.toUpperCase()}]`,
+                    });
                     snipes++;
                   } else {
-                    client.say(channel, `Last one: ${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price}`);
                     snipes++;
+                    items.push({
+                      type: body.result[0].rarity,
+                      rate: 0,
+                      msg: `Last one: ${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price}`,
+                    });
                   }
                 } else {
-                  client.say(channel, `Last one: ${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price}`);
                   snipes++;
+                  items.push({
+                    type: body.result[0].rarity,
+                    rate: 0,
+                    msg: `Last one: ${body.result[0].name} (${body.result[0].type}) - ${body.result[0].price}`,
+                  });
                 }
               }
             }
           }
-          if(count==listcount&&snipes==0){
+          if (count == listcount && snipes == 0) {
             let cooldown = await getCooldown(channel);
-            client.say(channel,`There are no snipes on the market try again in ${cooldown} secs.`);
+            client.say(channel, `There are no snipes on the market try again in ${cooldown} secs.`);
+          } else if (count == listcount) {
+            items.sort((a, b) => {
+              return b.rate - a.rate;
+            });
+            
+            let max = await getSnipeListAmount(channel);
+            
+            if (max > items.length) max = items.length;
+            let snipes = items.slice(0, max);
+
+            snipes.sort((a, b) => {
+              return a.rarity > b.rarity ? 1 : -1;
+            });
+            for (var i = 0; i < max; i++) {
+              await client.say(channel, snipes[i].msg);
+            }
           }
         });
     }
