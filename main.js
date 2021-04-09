@@ -210,6 +210,8 @@ client.on("message", async (channel, userstate, message, self) => {
     }
   } else if (message.toLowerCase().startsWith("!bot") || message.toLowerCase().startsWith("!vengebot")) {
     client.say(channel, `Support Discord - https://discord.gg/eNGMCPVtUU`);
+  } else if(message.toLowerCase().startsWith("!github")){
+    client.say(channel,"Github - https://github.com/PoweredByWard/vengemarket")
   } else if (message.toLowerCase().startsWith("!docs") || message.toLowerCase().startsWith("!documentation") || message.toLowerCase().startsWith("!command")) {
     client.say(channel, `Documentation - https://powered.gitbook.io/venge-market`);
   } else if (message.toLowerCase().startsWith("!setcooldown")) {
