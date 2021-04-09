@@ -134,7 +134,7 @@ async function checkConnection() {
       .catch((err) => console.error("Reconnection error", err.stack));
   }
 }
-const channels = ["PoweredTV","KaytaAkaSaucy","Tomogunchi","Slim3cube"];
+const channels = ["PoweredTV","KaytaAkaSaucy","Tomogunchi","Slim3cube", "KruzShady"];
 //const channels = ["poweredtvbot"];
 const opts = {
   options: {
